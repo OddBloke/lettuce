@@ -551,9 +551,10 @@ class Scenario(object):
         self.name = name
         self.language = language
         self.remaining_lines = remaining_lines
-        self.steps = self._parse_remaining_lines(remaining_lines,
-                                                 with_file,
-                                                 original_string)
+        self.original_steps = self._parse_remaining_lines(remaining_lines,
+                                                          with_file,
+                                                          original_string)
+        self.steps = deepcopy(self.original_steps)
         self.keys = keys
         self.outlines = outlines
         self.with_file = with_file
@@ -697,15 +698,28 @@ class Scenario(object):
         call_hook('before_each', 'scenario', self)
 
         def run_scenario(almost_self, order=-1, outline=None, run_callbacks=False):
-            try:
-                if self.background:
-                    self.background.run(ignore_case)
+            total_attempts = 3 if 'retry' in self.tags else 1
+            attempts = 0
+            while attempts < total_attempts:
+                try:
+                    if self.background:
+                        self.background.run(ignore_case)
 
-                all_steps, steps_passed, steps_failed, steps_undefined, reasons_to_fail = Step.run_all(self.steps, outline, run_callbacks, ignore_case, failfast=failfast)
-            except:
-                if failfast:
-                    call_hook('after_each', 'scenario', self)
-                raise
+                    all_steps, steps_passed, steps_failed, steps_undefined, reasons_to_fail = Step.run_all(self.steps, outline, run_callbacks, ignore_case, failfast=failfast)
+                except:
+                    if failfast:
+                        call_hook('after_each', 'scenario', self)
+                    raise
+                if all_steps == steps_passed:
+                    break
+                new_steps = []
+                for step in self.original_steps:
+                    new_step = deepcopy(step)
+                    new_step.original_sentence = step.sentence
+                    new_step.scenario = self
+                    new_steps.append(new_step)
+                self.steps = new_steps
+                attempts += 1
 
             skip = lambda x: x not in steps_passed and x not in steps_undefined and x not in steps_failed
 
