@@ -47,6 +47,7 @@ def enable(filename=None):
     root.setAttribute("hostname", "localhost")
     root.setAttribute("timestamp", datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
     output_filename = filename or "lettucetests.xml"
+    current_scenario_testcases = []
 
     @before.each_step
     def time_step(step):
@@ -57,7 +58,7 @@ def enable(filename=None):
         parent = step.scenario or step.background
         if getattr(parent, 'outlines', None):
             return
-        
+
         name = getattr(parent, 'name', 'Background')    # Background sections are nameless
         classname = u"%s : %s" % (parent.feature.name, name)
         tc = doc.createElement("testcase")
@@ -82,7 +83,7 @@ def enable(filename=None):
             failure.appendChild(cdata)
             tc.appendChild(failure)
 
-        root.appendChild(tc)
+        current_scenario_testcases.append(tc)
 
     @before.outline
     def time_outline(scenario, order, outline, reasons_to_fail):
@@ -104,7 +105,16 @@ def enable(filename=None):
             failure.appendChild(cdata)
             tc.appendChild(failure)
 
-        root.appendChild(tc)
+        current_scenario_testcases.append(tc)
+
+    @before.each_scenario_retry
+    def clear_test_cases(scenario):
+        current_scenario_testcases[:] = []
+
+    @after.each_scenario
+    def fill_scenario_test_cases(scenario):
+        for tc in current_scenario_testcases:
+            root.appendChild(tc)
 
     @after.all
     def output_xml(total):
