@@ -701,6 +701,8 @@ class Scenario(object):
             total_attempts = 3 if 'retry' in self.tags else 1
             attempts = 0
             while attempts < total_attempts:
+                if attempts >= 1:
+                    call_hook('before_each', 'scenario_retry', self)
                 try:
                     if self.background:
                         self.background.run(ignore_case)
